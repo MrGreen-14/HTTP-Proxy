@@ -1,0 +1,12 @@
+# build
+build/
+build-*/
+*.o
+a.out
+
+# laborator personal (nu se publica)
+learn/
+scratch/
+
+# diverse
+*.log
