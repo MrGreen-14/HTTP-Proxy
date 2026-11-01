@@ -10,7 +10,7 @@ char *trim(char*s)
     size_t n=strlen(s);
     while(n>0&&(s[n-1]==' '||s[n-1]=='\t'))
     {
-n--;
+        n--;
     }
     s[n]='\0';
     return s;
@@ -72,6 +72,11 @@ int parse_header_line(char*line,Header*h)
     return 0;
 }
 
+
+// GET / HTTP/1.1\r\nHost: x\r\n\r\n
+//iter1:  "GET / HTTP/1.1" -> m->first
+//iter2:  "Host: x" -> m->headers[0]
+//iter3:  "" -> linie goala → return 0
 
 int parse_message_head(const char*text,Message*m)
 {

@@ -2,7 +2,11 @@
 build/
 build-*/
 *.o
+*.d
 a.out
+
+# teste (nu se publica)
+tests/
 
 # laborator personal (nu se publica)
 learn/
