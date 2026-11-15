@@ -4,6 +4,7 @@
 #include "intercept.h"
 #include "net.h"
 #include "build.h"
+#include "history.h"
 #include "client.h"
 
 void *client_thread(void *arg)
@@ -33,6 +34,10 @@ void *client_thread(void *arg)
     int pu;
     int outlen;
     int rr;
+    unsigned long xid = 0;
+    int dec;
+    const char *hend0;
+    size_t extra0;
 
     ssize_t len = read_head(cli, data, MAX_HEAD);
     if (len == -2)
@@ -78,8 +83,17 @@ void *client_thread(void *arg)
 
     cl = find_header(&req, "Content-Length");
     clen = cl != NULL ? strtoll(cl, NULL, 10) : 0;
-    if (!intercept("CERERE", &req, clen))
+
+    xid = history_new_id();
+    hend0 = strstr(data, "\r\n\r\n") + 4;
+    extra0 = (size_t)(data + len - hend0);
+
+    dec = intercept("CERERE", &req, clen);
+    history_log(xid, "CERERE", intercept_decision_name(dec), &req, hend0, extra0, clen);
+    if (dec == DEC_DROP)
     {
+        printf("[DROP] cerere aruncata: %s %s (clientul primeste 403)\n", r.method, r.url);
+        fflush(stdout);
         reply(cli, 403, "Cererea a fost aruncata (Drop)\n");
         goto done;
     }
@@ -176,8 +190,13 @@ void *client_thread(void *arg)
         goto done;
     }
 
-    if (!intercept("RASPUNS", &rsp, (long long)(resp_len - hend_resp)))
+    dec = intercept("RASPUNS", &rsp, (long long)(resp_len - hend_resp));
+    history_log(xid, "RASPUNS", intercept_decision_name(dec), &rsp,
+                resp + hend_resp, resp_len - hend_resp, (long long)(resp_len - hend_resp));
+    if (dec == DEC_DROP)
     {
+        printf("[DROP] raspuns aruncat: %s %s <- %s (clientul primeste 403)\n", r.method, r.url, rsp.first);
+        fflush(stdout);
         reply(cli, 403, "Raspunsul a fost aruncat (Drop)\n");
         goto done;
     }

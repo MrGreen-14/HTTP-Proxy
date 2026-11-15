@@ -6,7 +6,7 @@ LDFLAGS += -pthread
 BUILD := build
 
 # Modulele comune (tot ce nu contine un main())
-CORE := parser headers intercept net build client
+CORE := parser headers intercept net build client history
 CORE_OBJ := $(addprefix $(BUILD)/,$(addsuffix .o,$(CORE)))
 
 # Obiectele necesare testului de interceptare (fara retea)

@@ -1,6 +1,7 @@
 #include "common.h"
 #include "intercept.h"
 #include "client.h"
+#include "history.h"
 
 int main(void)
 {
@@ -35,6 +36,20 @@ int main(void)
 
     printf("Proxy pornit pe 127.0.0.1:8080. Interceptare PORNITA.\n");
     printf("Comenzi: f, d, set Nume: valoare, del Nume, show, on, off\n");
+
+    const char *hpath = getenv("PROXY_HISTORY");
+    if (hpath == NULL)
+    {
+        hpath = HISTORY_FILE;
+    }
+    if (history_open(hpath) == 0)
+    {
+        printf("Istoric salvat in %s\n", hpath);
+    }
+    else
+    {
+        printf("Atentie: nu pot deschide %s; istoricul nu se salveaza\n", hpath);
+    }
     fflush(stdout);
 
     pthread_t ct;

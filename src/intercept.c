@@ -35,7 +35,7 @@ int intercept(const char *kind, Message *m, long long body_len)
     {
         pthread_mutex_unlock(&mu);
         pthread_mutex_unlock(&gate);
-        return 1;
+        return DEC_PASSTHROUGH;
     }
 
     pending = m;
@@ -47,6 +47,7 @@ int intercept(const char *kind, Message *m, long long body_len)
     printf("f = forward, d = drop, set Nume: valoare, del Nume, show, off\n> ");
     fflush(stdout);
 
+    int timed_out = 0;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += TIMEOUT_SEC;
@@ -58,6 +59,7 @@ int intercept(const char *kind, Message *m, long long body_len)
         if (rc == ETIMEDOUT && decision == 0)
         {
             decision = 1;
+            timed_out = 1;
             printf("\n(%d s fara decizie: mesajul este trimis automat)\n", TIMEOUT_SEC);
         }
     }
@@ -68,7 +70,23 @@ int intercept(const char *kind, Message *m, long long body_len)
     pthread_mutex_unlock(&mu);
     pthread_mutex_unlock(&gate);
 
-    return d == 1;
+    if (d == 2)
+    {
+        return DEC_DROP;
+    }
+    return timed_out ? DEC_TIMEOUT : DEC_FORWARD;
+}
+
+const char *intercept_decision_name(int dec)
+{
+    switch (dec)
+    {
+        case DEC_DROP:        return "drop";
+        case DEC_FORWARD:     return "forward";
+        case DEC_TIMEOUT:     return "timeout";
+        case DEC_PASSTHROUGH: return "passthrough";
+        default:              return "necunoscut";
+    }
 }
 
 void *console_thread(void *unused)

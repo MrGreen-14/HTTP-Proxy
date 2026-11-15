@@ -31,6 +31,8 @@
 #define TIMEOUT_SEC 60
 #endif
 
+#define HISTORY_FILE "history.jsonl"
+
 typedef struct Header
 {
     char nume[64];
