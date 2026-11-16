@@ -44,7 +44,7 @@ unsigned long history_new_id(void)
     return id;
 }
 
-/* Este "s" text UTF-8 valid? (JSON accepta doar text valid; altfel folosim base64.) */
+
 static int valid_utf8(const unsigned char *s, size_t n)
 {
     size_t i = 0;
@@ -97,7 +97,7 @@ static int valid_utf8(const unsigned char *s, size_t n)
     return 1;
 }
 
-/* Scrie un sir JSON intre ghilimele. Ghilimelele, \ si caracterele de control sunt "escapate". */
+
 static void put_json_str(FILE *f, const unsigned char *s, size_t n, int utf8_ok)
 {
     fputc('"', f);
@@ -130,7 +130,7 @@ static void put_json_str(FILE *f, const unsigned char *s, size_t n, int utf8_ok)
     fputc('"', f);
 }
 
-/* Text (prima linie, nume/valoare de header): daca nu e UTF-8 valid, octetii ciudati devin '?'. */
+
 static void put_text(FILE *f, const char *s)
 {
     size_t n = strlen(s);
@@ -138,7 +138,7 @@ static void put_text(FILE *f, const char *s)
     put_json_str(f, (const unsigned char *)s, n, valid_utf8((const unsigned char *)s, n));
 }
 
-/* Octetii oarecare (corp binar) se scriu ca base64, intre ghilimele. */
+
 static void put_b64(FILE *f, const unsigned char *s, size_t n)
 {
     static const char T[] =
@@ -198,14 +198,11 @@ void history_log(unsigned long id, const char *kind, const char *decision,
     gmtime_r(&now, &tmv);
     strftime(ts, sizeof ts, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 
-    /* cat din corp pastram */
     keep = (b == NULL) ? 0 : body_have;
     if (keep > HISTORY_BODY_MAX)
     {
         keep = HISTORY_BODY_MAX;
     }
-    /* daca taiem in mijlocul unui caracter UTF-8 (octet de continuare), mergem inapoi pana la
-       inceputul lui, ca previzualizarea sa ramana text valid */
     if (b != NULL && keep < body_have)
     {
         while (keep > 0 && (b[keep] & 0xC0) == 0x80)
@@ -248,4 +245,14 @@ void history_log(unsigned long id, const char *kind, const char *decision,
 
     fflush(fp);
     pthread_mutex_unlock(&hmu);
+}
+
+void history_error(unsigned long id, int code, const char *message)
+{
+    Message m;
+
+    memset(&m, 0, sizeof m);
+    snprintf(m.first, sizeof m.first, "%d %s", code, message);
+    m.first[strcspn(m.first, "\r\n")] = '\0';
+    history_log(id, "EROARE", "proxy", &m, NULL, 0, 0);
 }

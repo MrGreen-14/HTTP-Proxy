@@ -7,6 +7,13 @@
 #include "history.h"
 #include "client.h"
 
+static void fail(int cli, unsigned long xid, int code, const char *msg)
+{
+    history_error(xid, code, msg);
+    reply(cli, code, msg);
+}
+
+
 void *client_thread(void *arg)
 {
     int cli = *(int *)arg;
@@ -34,7 +41,7 @@ void *client_thread(void *arg)
     int pu;
     int outlen;
     int rr;
-    unsigned long xid = 0;
+    unsigned long xid = history_new_id();
     int dec;
     const char *hend0;
     size_t extra0;
@@ -42,7 +49,7 @@ void *client_thread(void *arg)
     ssize_t len = read_head(cli, data, MAX_HEAD);
     if (len == -2)
     {
-        reply(cli, 400, "Cerere prea mare\n");
+        fail(cli, xid, 400, "Cerere prea mare\n");
         goto done;
     }
     if (len <= 0)
@@ -52,39 +59,38 @@ void *client_thread(void *arg)
 
     if (parse_message_head(data, &req) < 0)
     {
-        reply(cli, 400, "Cerere invalida\n");
+        fail(cli, xid, 400, "Cerere invalida\n");
         goto done;
     }
 
     snprintf(first_copy, sizeof first_copy, "%s", req.first);
     if (parse_request_line(first_copy, &r) < 0)
     {
-        reply(cli, 400, "Cerere invalida\n");
+        fail(cli, xid, 400, "Cerere invalida\n");
         goto done;
     }
 
     if (strcasecmp(r.method, "CONNECT") == 0)
     {
-        reply(cli, 501, "HTTPS nu este suportat\n");
+        fail(cli, xid, 501, "HTTPS nu este suportat\n");
         goto done;
     }
 
     pu = parse_url(r.url, host, sizeof host, &port, path, sizeof path);
     if (pu == -2)
     {
-        reply(cli, 501, "HTTPS nu este suportat\n");
+        fail(cli, xid, 501, "HTTPS nu este suportat\n");
         goto done;
     }
     if (pu < 0)
     {
-        reply(cli, 400, "Foloseste serverul ca proxy HTTP (URL complet)\n");
+        fail(cli, xid, 400, "Foloseste serverul ca proxy HTTP (URL complet)\n");
         goto done;
     }
 
     cl = find_header(&req, "Content-Length");
     clen = cl != NULL ? strtoll(cl, NULL, 10) : 0;
 
-    xid = history_new_id();
     hend0 = strstr(data, "\r\n\r\n") + 4;
     extra0 = (size_t)(data + len - hend0);
 
@@ -101,7 +107,7 @@ void *client_thread(void *arg)
     te = find_header(&req, "Transfer-Encoding");
     if (te != NULL && strcasestr(te, "chunked") != NULL)
     {
-        reply(cli, 501, "Body chunked in cerere nu este suportat\n");
+        fail(cli, xid, 501, "Body chunked in cerere nu este suportat\n");
         goto done;
     }
 
@@ -109,12 +115,12 @@ void *client_thread(void *arg)
     clen = cl != NULL ? strtoll(cl, NULL, 10) : 0;
     if (clen < 0)
     {
-        reply(cli, 400, "Content-Length invalid\n");
+        fail(cli, xid, 400, "Content-Length invalid\n");
         goto done;
     }
     if (clen > MAX_BODY)
     {
-        reply(cli, 413, "Body prea mare (maxim 10 MB)\n");
+        fail(cli, xid, 413, "Body prea mare (maxim 10 MB)\n");
         goto done;
     }
 
@@ -128,20 +134,20 @@ void *client_thread(void *arg)
     outlen = build_head(upfirst, &req, 1, out, sizeof out);
     if (outlen < 0)
     {
-        reply(cli, 400, "Cerere prea mare\n");
+        fail(cli, xid, 400, "Cerere prea mare\n");
         goto done;
     }
 
     srv = connect_to(host, port);
     if (srv < 0)
     {
-        reply(cli, 502, "Serverul nu raspunde\n");
+        fail(cli, xid, 502, "Serverul nu raspunde\n");
         goto done;
     }
 
     if (send_all(srv, out, (size_t)outlen) < 0)
     {
-        reply(cli, 502, "Serverul nu raspunde\n");
+        fail(cli, xid, 502, "Serverul nu raspunde\n");
         goto done;
     }
 
@@ -175,18 +181,18 @@ void *client_thread(void *arg)
                        &resp, &resp_len, &hend_resp);
     if (rr == -2)
     {
-        reply(cli, 502, "Raspuns prea mare (maxim 10 MB)\n");
+        fail(cli, xid, 502, "Raspuns prea mare (maxim 10 MB)\n");
         goto done;
     }
     if (rr < 0)
     {
-        reply(cli, 502, "Serverul nu a raspuns\n");
+        fail(cli, xid, 502, "Serverul nu a raspuns\n");
         goto done;
     }
 
     if (parse_message_head(resp, &rsp) < 0)
     {
-        reply(cli, 502, "Raspuns invalid de la server\n");
+        fail(cli, xid, 502, "Raspuns invalid de la server\n");
         goto done;
     }
 
@@ -207,7 +213,7 @@ void *client_thread(void *arg)
     outlen = build_head(rsp.first, &rsp, 0, out, sizeof out);
     if (outlen < 0)
     {
-        reply(cli, 502, "Raspuns prea mare\n");
+        fail(cli, xid, 502, "Raspuns prea mare\n");
         goto done;
     }
 
